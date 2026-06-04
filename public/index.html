@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz'Efrei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar" id="navbar">
+  <div class="nav-brand">
+    <span class="brand-icon">Q</span>
+    <span>Quiz<span class="brand-accent">'Efrei</span></span>
+  </div>
+  <div class="nav-links" id="navLinks">
+    <a href="#" class="nav-link" data-page="dashboard">Accueil</a>
+    <a href="#" class="nav-link" data-page="lists">Mes listes</a>
+    <a href="#" class="nav-link" data-page="classes">Classes</a>
+    <a href="#" class="nav-link admin-only hidden" data-page="admin">Admin</a>
+  </div>
+  <div class="nav-right">
+    <div class="user-pill" id="userPill">
+      <span id="userName"></span>
+      <span class="role-badge" id="roleLabel"></span>
+    </div>
+    <button class="btn btn-outline btn-sm" id="logoutBtn">Déconnexion</button>
+  </div>
+</nav>
+
+<!-- LANDING -->
+<div id="landing" class="page">
+  <div class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Pour les étudiants EFREI</div>
+      <h1 class="hero-title">Révisez mieux,<br>ensemble.</h1>
+      <p class="hero-sub">Quiz'Efrei est la plateforme de révision collaborative des étudiants et enseignants de l'EFREI. Créez des listes de révision, pratiquez des quiz interactifs et suivez votre progression.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" onclick="App.showAuth('register')">Créer un compte</button>
+        <button class="btn btn-outline btn-lg" onclick="App.showAuth('login')">Se connecter</button>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-card">
+        <div class="vc-header"><span class="vc-dot red"></span><span class="vc-dot yellow"></span><span class="vc-dot green"></span></div>
+        <div class="vc-question">Quelle est la complexité de quicksort en moyenne ?</div>
+        <div class="vc-choices">
+          <div class="vc-choice">O(n)</div>
+          <div class="vc-choice correct">O(n log n) ✓</div>
+          <div class="vc-choice">O(n²)</div>
+          <div class="vc-choice">O(log n)</div>
+        </div>
+        <div class="vc-score">Score: 85% <span class="score-bar"><span style="width:85%"></span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="features-section">
+    <h2 class="section-title">Tout ce dont vous avez besoin</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <h3>Listes de révision</h3>
+        <p>Créez, modifiez et partagez des listes de questions. Plusieurs types de questions supportés.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Quiz interactifs</h3>
+        <p>Pratiquez avec des quiz chronométrés. Score calculé automatiquement avec correction détaillée.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎓</div>
+        <h3>Espace enseignant</h3>
+        <p>Gérez vos classes, invitez des étudiants et évaluez-les avec des quiz notés.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤝</div>
+        <h3>Partage & collaboration</h3>
+        <p>Partagez vos listes avec vos camarades ou rejoignez les listes de vos enseignants.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" class="hidden">
+
+  <!-- DASHBOARD -->
+  <div id="dashboardPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1 id="dashGreeting">Bonjour !</h1>
+        <p class="page-sub" id="dashSub">Que voulez-vous faire aujourd'hui ?</p>
+      </div>
+    </div>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="dash-grid">
+      <div class="dash-section">
+        <div class="section-header">
+          <h2>Activité récente</h2>
+          <a href="#" class="link" onclick="App.navigate('lists')">Voir tout</a>
+        </div>
+        <div id="recentActivity" class="activity-list"></div>
+      </div>
+      <div class="dash-section">
+        <div class="section-header">
+          <h2>Raccourcis</h2>
+        </div>
+        <div class="shortcuts-grid" id="shortcuts"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LISTS PAGE -->
+  <div id="listsPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1>Mes listes</h1>
+        <p class="page-sub">Gérez vos listes de révision</p>
+      </div>
+      <button class="btn btn-primary" onclick="Lists.showCreate()">+ Nouvelle liste</button>
+    </div>
+
+    <div class="tabs-row">
+      <button class="tab-btn active" onclick="Lists.switchTab('mine')">Mes listes</button>
+      <button class="tab-btn" onclick="Lists.switchTab('shared')">Partagées avec moi</button>
+      <button class="tab-btn" onclick="Lists.switchTab('public')">Publiques</button>
+    </div>
+
+    <div class="search-row">
+      <input type="text" class="search-input" placeholder="Rechercher une liste..." oninput="Lists.filter(this.value)">
+    </div>
+
+    <div id="listsGrid" class="lists-grid"></div>
+  </div>
+
+  <!-- LIST DETAIL -->
+  <div id="listDetailPage" class="page-content hidden">
+    <div class="page-header">
+      <button class="btn btn-ghost" onclick="App.navigate('lists')">← Retour</button>
+      <div class="header-actions" id="listActions"></div>
+    </div>
+    <div id="listDetailContent"></div>
+  </div>
+
+  <!-- QUIZ PLAYER -->
+  <div id="quizPage" class="page-content hidden">
+    <div id="quizContent"></div>
+  </div>
+
+  <!-- CLASSES PAGE -->
+  <div id="classesPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1>Classes</h1>
+        <p class="page-sub" id="classesSubtitle">Vos classes</p>
+      </div>
+      <div id="classesHeaderActions"></div>
+    </div>
+    <div id="classesGrid" class="lists-grid"></div>
+  </div>
+
+  <!-- CLASS DETAIL -->
+  <div id="classDetailPage" class="page-content hidden">
+    <div class="page-header">
+      <button class="btn btn-ghost" onclick="App.navigate('classes')">← Retour</button>
+      <div id="classDetailActions"></div>
+    </div>
+    <div id="classDetailContent"></div>
+  </div>
+
+  <!-- ADMIN PAGE -->
+  <div id="adminPage" class="page-content hidden">
+    <div class="page-header">
+      <h1>Administration</h1>
+    </div>
+    <div id="adminContent"></div>
+  </div>
+
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay hidden" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="App.closeAuth()">✕</button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="loginTab" onclick="App.switchAuthTab('login')">Connexion</button>
+      <button class="auth-tab" id="registerTab" onclick="App.switchAuthTab('register')">Inscription</button>
+    </div>
+
+    <form id="loginForm" class="auth-form">
+      <h2>Bienvenue !</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" required placeholder="votre@email.com">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input type="password" name="password" required placeholder="••••••••">
+      </div>
+      <div class="form-error hidden" id="loginError"></div>
+      <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
+    </form>
+
+    <form id="registerForm" class="auth-form hidden">
+      <h2>Créer un compte</h2>
+      <div class="form-group">
+        <label>Nom complet</label>
+        <input type="text" name="name" required placeholder="Jean Dupont">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" required placeholder="votre@efrei.net">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input type="password" name="password" required placeholder="Min. 6 caractères" minlength="6">
+      </div>
+      <div class="form-group">
+        <label>Je suis...</label>
+        <div class="role-select">
+          <label class="role-option">
+            <input type="radio" name="role" value="student" checked>
+            <span class="role-card"><span class="role-card-icon">🎓</span><span>Étudiant</span></span>
+          </label>
+          <label class="role-option">
+            <input type="radio" name="role" value="teacher">
+            <span class="role-card"><span class="role-card-icon">👨‍🏫</span><span>Enseignant</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="form-error hidden" id="registerError"></div>
+      <button type="submit" class="btn btn-primary btn-full">Créer mon compte</button>
+    </form>
+  </div>
+</div>
+
+<!-- GENERIC MODAL -->
+<div class="modal-overlay hidden" id="genericModal">
+  <div class="modal" id="genericModalBox">
+    <button class="modal-close" onclick="Modal.close()">✕</button>
+    <div id="genericModalContent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/modal.js"></script>
+<script src="/js/lists.js"></script>
+<script src="/js/quiz.js"></script>
+<script src="/js/classes.js"></script>
+<script src="/js/admin.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
