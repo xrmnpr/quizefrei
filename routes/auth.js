@@ -17,46 +17,54 @@ router.post('/register', async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
+  try {
+    const existing = await db.queryOne('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (existing) return res.status(409).json({ error: 'Email already in use' });
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
-  if (existing) {
-    return res.status(409).json({ error: 'Email already in use' });
+    const hash = await bcrypt.hash(password, 10);
+    const id = uuidv4();
+    await db.query(
+      'INSERT INTO users (id, email, password_hash, name, role) VALUES ($1,$2,$3,$4,$5)',
+      [id, email.toLowerCase(), hash, name, role]
+    );
+    const token = signToken({ id, email: email.toLowerCase(), name, role });
+    res.status(201).json({ token, user: { id, email: email.toLowerCase(), name, role } });
+  } catch (err) {
+    console.error('Register error:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const hash = await bcrypt.hash(password, 10);
-  const id = uuidv4();
-  db.prepare('INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)').run(
-    id, email.toLowerCase(), hash, name, role
-  );
-
-  const token = signToken({ id, email: email.toLowerCase(), name, role });
-  res.status(201).json({ token, user: { id, email: email.toLowerCase(), name, role } });
 });
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  try {
+    const user = await db.queryOne('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    const token = signToken({ id: user.id, email: user.email, name: user.name, role: user.role });
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  } catch (err) {
+    console.error('Login error:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const token = signToken({ id: user.id, email: user.email, name: user.name, role: user.role });
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 });
 
-router.get('/me', authenticate, (req, res) => {
-  const user = db.prepare('SELECT id, email, name, role, created_at FROM users WHERE id = ?').get(req.user.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json(user);
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await db.queryOne(
+      'SELECT id, email, name, role, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    console.error('Me error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

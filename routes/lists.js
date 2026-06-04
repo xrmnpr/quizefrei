@@ -6,228 +6,263 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 router.use(authenticate);
 
-// Get all lists accessible to the current user
-router.get('/', (req, res) => {
+// All lists accessible to the current user
+router.get('/', async (req, res) => {
   const { id: userId, role } = req.user;
-  let lists;
+  try {
+    let lists;
+    if (role === 'admin') {
+      lists = await db.query(`
+        SELECT l.*, u.name AS owner_name
+        FROM lists l JOIN users u ON u.id = l.owner_id
+        ORDER BY l.created_at DESC
+      `);
+    } else {
+      lists = await db.query(`
+        SELECT DISTINCT l.*, u.name AS owner_name, (l.owner_id = $1) AS is_mine
+        FROM lists l JOIN users u ON u.id = l.owner_id
+        WHERE l.owner_id = $2
+          OR l.is_public = TRUE
+          OR EXISTS (SELECT 1 FROM list_shares ls WHERE ls.list_id = l.id AND ls.shared_with_id = $3)
+          OR EXISTS (
+            SELECT 1 FROM class_lists cl
+            JOIN class_members cm ON cm.class_id = cl.class_id
+            WHERE cl.list_id = l.id AND cm.student_id = $4
+          )
+        ORDER BY l.created_at DESC
+      `, [userId, userId, userId, userId]);
+    }
 
-  if (role === 'admin') {
-    lists = db.prepare(`
-      SELECT l.*, u.name as owner_name FROM lists l
-      JOIN users u ON u.id = l.owner_id
-      ORDER BY l.created_at DESC
-    `).all();
-  } else {
-    lists = db.prepare(`
-      SELECT DISTINCT l.*, u.name as owner_name,
-        CASE WHEN l.owner_id = ? THEN 1 ELSE 0 END as is_mine
-      FROM lists l
-      JOIN users u ON u.id = l.owner_id
-      WHERE l.owner_id = ?
-        OR l.is_public = 1
-        OR EXISTS (SELECT 1 FROM list_shares ls WHERE ls.list_id = l.id AND ls.shared_with_id = ?)
-        OR EXISTS (
-          SELECT 1 FROM class_lists cl
-          JOIN class_members cm ON cm.class_id = cl.class_id
-          WHERE cl.list_id = l.id AND cm.student_id = ?
-        )
-      ORDER BY l.created_at DESC
-    `).all(userId, userId, userId, userId);
+    // Attach question count
+    const withCounts = await Promise.all(lists.map(async l => {
+      const row = await db.queryOne('SELECT COUNT(*) AS c FROM questions WHERE list_id = $1', [l.id]);
+      return { ...l, question_count: Number(row.c) };
+    }));
+    res.json(withCounts);
+  } catch (err) {
+    console.error('GET /lists:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const withCounts = lists.map(l => ({
-    ...l,
-    question_count: db.prepare('SELECT COUNT(*) as c FROM questions WHERE list_id = ?').get(l.id).c
-  }));
-
-  res.json(withCounts);
 });
 
-// Get my lists only
-router.get('/mine', (req, res) => {
-  const lists = db.prepare(`
-    SELECT l.*, u.name as owner_name,
-      (SELECT COUNT(*) FROM questions WHERE list_id = l.id) as question_count
-    FROM lists l JOIN users u ON u.id = l.owner_id
-    WHERE l.owner_id = ?
-    ORDER BY l.created_at DESC
-  `).all(req.user.id);
-  res.json(lists);
+// Only my lists
+router.get('/mine', async (req, res) => {
+  try {
+    const lists = await db.query(`
+      SELECT l.*, u.name AS owner_name,
+        (SELECT COUNT(*) FROM questions WHERE list_id = l.id) AS question_count
+      FROM lists l JOIN users u ON u.id = l.owner_id
+      WHERE l.owner_id = $1
+      ORDER BY l.created_at DESC
+    `, [req.user.id]);
+    res.json(lists.map(l => ({ ...l, question_count: Number(l.question_count) })));
+  } catch (err) {
+    console.error('GET /lists/mine:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Get a single list with its questions and choices
-router.get('/:id', (req, res) => {
-  const list = db.prepare('SELECT l.*, u.name as owner_name FROM lists l JOIN users u ON u.id = l.owner_id WHERE l.id = ?').get(req.params.id);
-  if (!list) return res.status(404).json({ error: 'List not found' });
+// Single list with questions + choices
+router.get('/:id', async (req, res) => {
+  try {
+    const list = await db.queryOne(
+      'SELECT l.*, u.name AS owner_name FROM lists l JOIN users u ON u.id = l.owner_id WHERE l.id = $1',
+      [req.params.id]
+    );
+    if (!list) return res.status(404).json({ error: 'List not found' });
 
-  const { id: userId, role } = req.user;
-  const canAccess =
-    role === 'admin' ||
-    list.owner_id === userId ||
-    list.is_public ||
-    db.prepare('SELECT 1 FROM list_shares WHERE list_id = ? AND shared_with_id = ?').get(req.params.id, userId) ||
-    db.prepare(`
-      SELECT 1 FROM class_lists cl JOIN class_members cm ON cm.class_id = cl.class_id
-      WHERE cl.list_id = ? AND cm.student_id = ?
-    `).get(req.params.id, userId);
+    const { id: userId, role } = req.user;
+    const shareRow  = await db.queryOne('SELECT 1 FROM list_shares WHERE list_id = $1 AND shared_with_id = $2', [req.params.id, userId]);
+    const classRow  = await db.queryOne(`
+      SELECT 1 FROM class_lists cl
+      JOIN class_members cm ON cm.class_id = cl.class_id
+      WHERE cl.list_id = $1 AND cm.student_id = $2
+    `, [req.params.id, userId]);
 
-  if (!canAccess) return res.status(403).json({ error: 'Access denied' });
+    if (role !== 'admin' && list.owner_id !== userId && !list.is_public && !shareRow && !classRow) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
 
-  const questions = db.prepare('SELECT * FROM questions WHERE list_id = ? ORDER BY order_index').all(req.params.id);
-  const questionsWithChoices = questions.map(q => ({
-    ...q,
-    choices: db.prepare('SELECT * FROM choices WHERE question_id = ?').all(q.id)
-  }));
+    const questions = await db.query('SELECT * FROM questions WHERE list_id = $1 ORDER BY order_index', [req.params.id]);
+    const questionsWithChoices = await Promise.all(questions.map(async q => ({
+      ...q,
+      choices: await db.query('SELECT * FROM choices WHERE question_id = $1', [q.id])
+    })));
 
-  res.json({ ...list, questions: questionsWithChoices });
+    res.json({ ...list, questions: questionsWithChoices });
+  } catch (err) {
+    console.error('GET /lists/:id:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Create a list
-router.post('/', (req, res) => {
+// Create list
+router.post('/', async (req, res) => {
   const { title, description, is_public } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
-
-  const id = uuidv4();
-  db.prepare('INSERT INTO lists (id, title, description, owner_id, is_public) VALUES (?, ?, ?, ?, ?)').run(
-    id, title, description || null, req.user.id, is_public ? 1 : 0
-  );
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(id);
-  res.status(201).json(list);
+  try {
+    const id = uuidv4();
+    await db.query(
+      'INSERT INTO lists (id, title, description, owner_id, is_public) VALUES ($1,$2,$3,$4,$5)',
+      [id, title, description || null, req.user.id, !!is_public]
+    );
+    res.status(201).json(await db.queryOne('SELECT * FROM lists WHERE id = $1', [id]));
+  } catch (err) {
+    console.error('POST /lists:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Update a list
-router.put('/:id', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list) return res.status(404).json({ error: 'List not found' });
-  if (list.owner_id !== req.user.id && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Not authorized' });
-  }
+// Update list
+router.put('/:id', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (list.owner_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Not authorized' });
 
-  const { title, description, is_public } = req.body;
-  db.prepare('UPDATE lists SET title = ?, description = ?, is_public = ? WHERE id = ?').run(
-    title ?? list.title,
-    description !== undefined ? description : list.description,
-    is_public !== undefined ? (is_public ? 1 : 0) : list.is_public,
-    req.params.id
-  );
-  res.json(db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id));
+    const { title, description, is_public } = req.body;
+    await db.query('UPDATE lists SET title=$1, description=$2, is_public=$3 WHERE id=$4', [
+      title ?? list.title,
+      description !== undefined ? description : list.description,
+      is_public !== undefined ? !!is_public : list.is_public,
+      req.params.id
+    ]);
+    res.json(await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]));
+  } catch (err) {
+    console.error('PUT /lists/:id:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Delete a list
-router.delete('/:id', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list) return res.status(404).json({ error: 'List not found' });
-  if (list.owner_id !== req.user.id && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Not authorized' });
+// Delete list
+router.delete('/:id', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (list.owner_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Not authorized' });
+    await db.query('DELETE FROM lists WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /lists/:id:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-  db.prepare('DELETE FROM lists WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
 });
 
-// Add a question to a list
-router.post('/:id/questions', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list) return res.status(404).json({ error: 'List not found' });
-  if (list.owner_id !== req.user.id && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Not authorized' });
-  }
+// Add question
+router.post('/:id/questions', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (list.owner_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Not authorized' });
 
-  const { question_text, question_type, choices } = req.body;
-  if (!question_text || !question_type) {
-    return res.status(400).json({ error: 'question_text and question_type are required' });
-  }
+    const { question_text, question_type, choices } = req.body;
+    if (!question_text || !question_type) return res.status(400).json({ error: 'question_text and question_type are required' });
 
-  const maxOrder = db.prepare('SELECT MAX(order_index) as m FROM questions WHERE list_id = ?').get(req.params.id);
-  const orderIndex = (maxOrder.m ?? -1) + 1;
+    const maxRow = await db.queryOne('SELECT COALESCE(MAX(order_index),-1) AS m FROM questions WHERE list_id = $1', [req.params.id]);
+    const orderIndex = Number(maxRow.m) + 1;
 
-  const qId = uuidv4();
-  db.prepare('INSERT INTO questions (id, list_id, question_text, question_type, order_index) VALUES (?, ?, ?, ?, ?)').run(
-    qId, req.params.id, question_text, question_type, orderIndex
-  );
+    const qId = uuidv4();
+    await db.query(
+      'INSERT INTO questions (id, list_id, question_text, question_type, order_index) VALUES ($1,$2,$3,$4,$5)',
+      [qId, req.params.id, question_text, question_type, orderIndex]
+    );
 
-  if (choices && Array.isArray(choices)) {
-    for (const c of choices) {
-      db.prepare('INSERT INTO choices (id, question_id, choice_text, is_correct) VALUES (?, ?, ?, ?)').run(
-        uuidv4(), qId, c.choice_text, c.is_correct ? 1 : 0
-      );
+    if (Array.isArray(choices)) {
+      for (const c of choices) {
+        await db.query('INSERT INTO choices (id, question_id, choice_text, is_correct) VALUES ($1,$2,$3,$4)', [uuidv4(), qId, c.choice_text, !!c.is_correct]);
+      }
     }
-  }
 
-  const question = db.prepare('SELECT * FROM questions WHERE id = ?').get(qId);
-  question.choices = db.prepare('SELECT * FROM choices WHERE question_id = ?').all(qId);
-  res.status(201).json(question);
+    const question = await db.queryOne('SELECT * FROM questions WHERE id = $1', [qId]);
+    question.choices = await db.query('SELECT * FROM choices WHERE question_id = $1', [qId]);
+    res.status(201).json(question);
+  } catch (err) {
+    console.error('POST /lists/:id/questions:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Update a question
-router.put('/:listId/questions/:questionId', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.listId);
-  if (!list || (list.owner_id !== req.user.id && req.user.role !== 'admin')) {
-    return res.status(403).json({ error: 'Not authorized' });
-  }
+// Update question
+router.put('/:listId/questions/:questionId', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.listId]);
+    if (!list || (list.owner_id !== req.user.id && req.user.role !== 'admin')) return res.status(403).json({ error: 'Not authorized' });
 
-  const { question_text, question_type, choices } = req.body;
-  db.prepare('UPDATE questions SET question_text = ?, question_type = ? WHERE id = ? AND list_id = ?').run(
-    question_text, question_type, req.params.questionId, req.params.listId
-  );
+    const { question_text, question_type, choices } = req.body;
+    await db.query('UPDATE questions SET question_text=$1, question_type=$2 WHERE id=$3 AND list_id=$4', [question_text, question_type, req.params.questionId, req.params.listId]);
 
-  if (choices) {
-    db.prepare('DELETE FROM choices WHERE question_id = ?').run(req.params.questionId);
-    for (const c of choices) {
-      db.prepare('INSERT INTO choices (id, question_id, choice_text, is_correct) VALUES (?, ?, ?, ?)').run(
-        uuidv4(), req.params.questionId, c.choice_text, c.is_correct ? 1 : 0
-      );
+    if (choices) {
+      await db.query('DELETE FROM choices WHERE question_id = $1', [req.params.questionId]);
+      for (const c of choices) {
+        await db.query('INSERT INTO choices (id, question_id, choice_text, is_correct) VALUES ($1,$2,$3,$4)', [uuidv4(), req.params.questionId, c.choice_text, !!c.is_correct]);
+      }
     }
+
+    const question = await db.queryOne('SELECT * FROM questions WHERE id = $1', [req.params.questionId]);
+    if (question) question.choices = await db.query('SELECT * FROM choices WHERE question_id = $1', [req.params.questionId]);
+    res.json(question);
+  } catch (err) {
+    console.error('PUT question:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const question = db.prepare('SELECT * FROM questions WHERE id = ?').get(req.params.questionId);
-  if (question) question.choices = db.prepare('SELECT * FROM choices WHERE question_id = ?').all(req.params.questionId);
-  res.json(question);
 });
 
-// Delete a question
-router.delete('/:listId/questions/:questionId', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.listId);
-  if (!list || (list.owner_id !== req.user.id && req.user.role !== 'admin')) {
-    return res.status(403).json({ error: 'Not authorized' });
+// Delete question
+router.delete('/:listId/questions/:questionId', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.listId]);
+    if (!list || (list.owner_id !== req.user.id && req.user.role !== 'admin')) return res.status(403).json({ error: 'Not authorized' });
+    await db.query('DELETE FROM questions WHERE id=$1 AND list_id=$2', [req.params.questionId, req.params.listId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE question:', err.message);
+    res.status(500).json({ error: 'Server error' });
   }
-  db.prepare('DELETE FROM questions WHERE id = ? AND list_id = ?').run(req.params.questionId, req.params.listId);
-  res.json({ success: true });
 });
 
-// Share a list with a user by email
-router.post('/:id/share', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list) return res.status(404).json({ error: 'List not found' });
-  if (list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+// Share with a user by email
+router.post('/:id/share', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
 
-  const { email } = req.body;
-  const target = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email?.toLowerCase());
-  if (!target) return res.status(404).json({ error: 'User not found' });
-  if (target.id === req.user.id) return res.status(400).json({ error: 'Cannot share with yourself' });
+    const target = await db.queryOne('SELECT id, name, email FROM users WHERE email = $1', [req.body.email?.toLowerCase()]);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'Cannot share with yourself' });
 
-  db.prepare('INSERT OR IGNORE INTO list_shares (list_id, shared_with_id) VALUES (?, ?)').run(req.params.id, target.id);
-  res.json({ success: true, shared_with: { id: target.id, name: target.name, email: target.email } });
+    await db.query('INSERT INTO list_shares (list_id, shared_with_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.params.id, target.id]);
+    res.json({ success: true, shared_with: target });
+  } catch (err) {
+    console.error('POST /share:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Get shared users for a list
-router.get('/:id/shares', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list || list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
-
-  const shares = db.prepare(`
-    SELECT u.id, u.name, u.email FROM list_shares ls
-    JOIN users u ON u.id = ls.shared_with_id
-    WHERE ls.list_id = ?
-  `).all(req.params.id);
-  res.json(shares);
+// List shares
+router.get('/:id/shares', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT owner_id FROM lists WHERE id = $1', [req.params.id]);
+    if (!list || list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+    const shares = await db.query('SELECT u.id, u.name, u.email FROM list_shares ls JOIN users u ON u.id = ls.shared_with_id WHERE ls.list_id = $1', [req.params.id]);
+    res.json(shares);
+  } catch (err) {
+    console.error('GET /shares:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Remove a share
-router.delete('/:id/share/:userId', (req, res) => {
-  const list = db.prepare('SELECT * FROM lists WHERE id = ?').get(req.params.id);
-  if (!list || list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
-  db.prepare('DELETE FROM list_shares WHERE list_id = ? AND shared_with_id = ?').run(req.params.id, req.params.userId);
-  res.json({ success: true });
+router.delete('/:id/share/:userId', async (req, res) => {
+  try {
+    const list = await db.queryOne('SELECT owner_id FROM lists WHERE id = $1', [req.params.id]);
+    if (!list || list.owner_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
+    await db.query('DELETE FROM list_shares WHERE list_id=$1 AND shared_with_id=$2', [req.params.id, req.params.userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /share/:userId:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;
