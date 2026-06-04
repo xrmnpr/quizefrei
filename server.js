@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { init } = require('./db/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,11 +17,15 @@ app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/classes', require('./routes/classes'));
 app.use('/api/admin', require('./routes/admin'));
 
-// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Quiz'Efrei server running on port ${PORT}`);
-});
+init()
+  .then(() => {
+    app.listen(PORT, () => console.log(`Quiz'Efrei running on port ${PORT}`));
+  })
+  .catch(err => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
