@@ -173,8 +173,8 @@ input, textarea, select { font-family: inherit; }
   gap: 1.5rem; max-width: 1000px; margin: 0 auto;
 }
 .feature-card {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.1);
+  background: #252540;
+  border: 1px solid #35355a;
   border-radius: var(--radius);
   padding: 2rem 1.5rem;
   color: #fff;
@@ -560,6 +560,22 @@ input, textarea, select { font-family: inherit; }
 }
 .role-card-icon { font-size: 1.75rem; }
 .role-option input:checked + .role-card { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+/* ===== GOOGLE BUTTON ===== */
+.btn-google, .btn-google-lg {
+  display: inline-flex; align-items: center; justify-content: center; gap: .75rem;
+  background: #fff;
+  border: 1.5px solid #dadce0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+}
+.btn-google { padding: .7rem 1.5rem; font-size: .9rem; width: 100%; }
+.btn-google-lg { padding: .875rem 2rem; font-size: 1rem; }
+.btn-google:hover, .btn-google-lg:hover { background: #f8f9fa; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
 
 /* ===== TOAST ===== */
 .toast-container {

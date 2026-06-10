@@ -39,8 +39,10 @@
       <h1 class="hero-title">Révisez mieux,<br>ensemble.</h1>
       <p class="hero-sub">Quiz'Efrei est la plateforme de révision collaborative des étudiants et enseignants de l'EFREI. Créez des listes de révision, pratiquez des quiz interactifs et suivez votre progression.</p>
       <div class="hero-actions">
-        <button class="btn btn-primary btn-lg" onclick="App.showAuth('register')">Créer un compte</button>
-        <button class="btn btn-outline btn-lg" onclick="App.showAuth('login')">Se connecter</button>
+        <button class="btn-google-lg" onclick="App.signInWithGoogle()">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
       </div>
     </div>
     <div class="hero-visual">
@@ -184,59 +186,19 @@
 
 </div>
 
-<!-- AUTH MODAL -->
+<!-- AUTH MODAL (shown only when the user explicitly clicks a sign-in button) -->
 <div class="modal-overlay hidden" id="authModal">
-  <div class="modal">
-    <button class="modal-close" onclick="App.closeAuth()">✕</button>
-    <div class="auth-tabs">
-      <button class="auth-tab active" id="loginTab" onclick="App.switchAuthTab('login')">Connexion</button>
-      <button class="auth-tab" id="registerTab" onclick="App.switchAuthTab('register')">Inscription</button>
+  <div class="modal" style="text-align:center;padding:2.5rem 2rem">
+    <div class="auth-logo">
+      <span class="brand-icon" style="width:48px;height:48px;font-size:1.5rem;margin:0 auto 1rem">Q</span>
     </div>
-
-    <form id="loginForm" class="auth-form">
-      <h2>Bienvenue !</h2>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" required placeholder="votre@email.com">
-      </div>
-      <div class="form-group">
-        <label>Mot de passe</label>
-        <input type="password" name="password" required placeholder="••••••••">
-      </div>
-      <div class="form-error hidden" id="loginError"></div>
-      <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
-    </form>
-
-    <form id="registerForm" class="auth-form hidden">
-      <h2>Créer un compte</h2>
-      <div class="form-group">
-        <label>Nom complet</label>
-        <input type="text" name="name" required placeholder="Jean Dupont">
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" required placeholder="votre@efrei.net">
-      </div>
-      <div class="form-group">
-        <label>Mot de passe</label>
-        <input type="password" name="password" required placeholder="Min. 6 caractères" minlength="6">
-      </div>
-      <div class="form-group">
-        <label>Je suis...</label>
-        <div class="role-select">
-          <label class="role-option">
-            <input type="radio" name="role" value="student" checked>
-            <span class="role-card"><span class="role-card-icon">🎓</span><span>Étudiant</span></span>
-          </label>
-          <label class="role-option">
-            <input type="radio" name="role" value="teacher">
-            <span class="role-card"><span class="role-card-icon">👨‍🏫</span><span>Enseignant</span></span>
-          </label>
-        </div>
-      </div>
-      <div class="form-error hidden" id="registerError"></div>
-      <button type="submit" class="btn btn-primary btn-full">Créer mon compte</button>
-    </form>
+    <h2 style="margin-bottom:.5rem">Bienvenue sur Quiz'Efrei</h2>
+    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:2rem">Connectez-vous avec votre compte Google pour continuer.</p>
+    <button class="btn-google" onclick="App.signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continuer avec Google
+    </button>
+    <div id="authError" class="form-error hidden" style="margin-top:1rem;text-align:left"></div>
   </div>
 </div>
 

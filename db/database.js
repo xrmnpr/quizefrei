@@ -112,6 +112,17 @@ async function init() {
       is_correct  BOOLEAN
     );
   `);
+  // Migrations — safe to run on every boot (IF NOT EXISTS / DO blocks are idempotent)
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT UNIQUE;
+  `);
+  // Make password_hash nullable so Google-only users don't need one
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+    EXCEPTION WHEN OTHERS THEN NULL; END $$;
+  `);
+
   console.log('Database schema ready');
 }
 

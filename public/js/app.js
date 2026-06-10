@@ -4,52 +4,55 @@ const App = (() => {
 
   function getUser() { return currentUser; }
 
-  function showAuth(tab = 'login') {
-    document.getElementById('authModal').classList.remove('hidden');
-    switchAuthTab(tab);
-  }
-  function closeAuth() { document.getElementById('authModal').classList.add('hidden'); }
+  // ── Google / Easy Auth ────────────────────────────────────────────────────
 
-  function switchAuthTab(tab) {
-    document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
-    document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
-    document.getElementById('loginTab').classList.toggle('active', tab === 'login');
-    document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+  function signInWithGoogle() {
+    // After Google auth, Azure redirects back to the same URL
+    window.location.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(window.location.pathname + window.location.search);
   }
+
+  function showAuth() {
+    document.getElementById('authModal').classList.remove('hidden');
+  }
+  function closeAuth() {
+    document.getElementById('authModal').classList.add('hidden');
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
 
   function navigate(page) {
     const pages = {
-      dashboard: 'dashboardPage',
-      lists: 'listsPage',
-      'list-detail': 'listDetailPage',
-      quiz: 'quizPage',
-      classes: 'classesPage',
+      dashboard:      'dashboardPage',
+      lists:          'listsPage',
+      'list-detail':  'listDetailPage',
+      quiz:           'quizPage',
+      classes:        'classesPage',
       'class-detail': 'classDetailPage',
-      admin: 'adminPage'
+      admin:          'adminPage'
     };
 
-    Object.values(pages).forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('hidden');
-    });
-
-    const target = pages[page];
-    if (target) document.getElementById(target)?.classList.remove('hidden');
-
+    Object.values(pages).forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    document.getElementById(pages[page])?.classList.remove('hidden');
     currentPage = page;
 
     document.querySelectorAll('.nav-link').forEach(l => {
       const p = l.dataset.page;
-      l.classList.toggle('active', p === page || (p === 'lists' && (page === 'list-detail' || page === 'quiz')) || (p === 'classes' && page === 'class-detail'));
+      l.classList.toggle('active',
+        p === page ||
+        (p === 'lists'   && (page === 'list-detail' || page === 'quiz')) ||
+        (p === 'classes' && page === 'class-detail')
+      );
     });
 
     if (page === 'dashboard') loadDashboard();
-    else if (page === 'lists') Lists.load();
+    else if (page === 'lists')   Lists.load();
     else if (page === 'classes') Classes.load();
-    else if (page === 'admin') Admin.load();
+    else if (page === 'admin')   Admin.load();
 
     window.scrollTo(0, 0);
   }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
 
   async function loadDashboard() {
     const user = currentUser;
@@ -76,19 +79,22 @@ const App = (() => {
     }
 
     try {
-      const [lists, sessions] = await Promise.all([API.getMyLists(), API.getMySessions()]);
-      const classes = await API.getClasses();
+      const [lists, sessions, classes] = await Promise.all([
+        API.getMyLists(),
+        API.getMySessions(),
+        API.getClasses()
+      ]);
 
-      const statsRow = document.getElementById('statsRow');
-      statsRow.innerHTML = `
+      const scored = sessions.filter(s => s.score !== null);
+      const avg = scored.length
+        ? Math.round(scored.reduce((a, s) => a + s.score, 0) / scored.length)
+        : null;
+
+      document.getElementById('statsRow').innerHTML = `
         <div class="stat-card"><div class="stat-value">${lists.length}</div><div class="stat-label">Mes listes</div></div>
         <div class="stat-card"><div class="stat-value">${sessions.length}</div><div class="stat-label">Quiz effectués</div></div>
         <div class="stat-card"><div class="stat-value">${classes.length}</div><div class="stat-label">Classes</div></div>
-        ${sessions.filter(s => s.score !== null).length > 0 ? `
-          <div class="stat-card">
-            <div class="stat-value">${Math.round(sessions.filter(s => s.score !== null).reduce((a, s) => a + s.score, 0) / sessions.filter(s => s.score !== null).length)}%</div>
-            <div class="stat-label">Score moyen</div>
-          </div>` : ''}
+        ${avg !== null ? `<div class="stat-card"><div class="stat-value">${avg}%</div><div class="stat-label">Score moyen</div></div>` : ''}
       `;
 
       const recent = sessions.slice(0, 5);
@@ -100,112 +106,85 @@ const App = (() => {
           <div class="activity-item">
             <span class="activity-icon">${s.score !== null ? (s.score >= 80 ? '🎉' : s.score >= 60 ? '👍' : '📚') : '✏'}</span>
             <div class="activity-info">
-              <div class="activity-title">${escHtml(s.list_title)}</div>
+              <div class="activity-title">${esc(s.list_title)}</div>
               <div class="activity-meta">${s.score !== null ? `Score : ${s.score}%` : 'Réponse libre'} · ${new Date(s.started_at).toLocaleDateString('fr-FR')}</div>
             </div>
           </div>
         `).join('');
       }
-    } catch {}
+    } catch { /* stats are non-critical */ }
   }
 
-  function setupAuth() {
-    document.getElementById('loginForm').onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const errEl = document.getElementById('loginError');
-      errEl.classList.add('hidden');
-      try {
-        const res = await API.login(fd.get('email'), fd.get('password'));
-        API.setToken(res.token);
-        currentUser = res.user;
-        localStorage.setItem('qe_user', JSON.stringify(res.user));
-        closeAuth();
-        mountApp();
-      } catch (err) {
-        errEl.textContent = err.message;
-        errEl.classList.remove('hidden');
-      }
-    };
-
-    document.getElementById('registerForm').onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const errEl = document.getElementById('registerError');
-      errEl.classList.add('hidden');
-      try {
-        const res = await API.register({ email: fd.get('email'), password: fd.get('password'), name: fd.get('name'), role: fd.get('role') });
-        API.setToken(res.token);
-        currentUser = res.user;
-        localStorage.setItem('qe_user', JSON.stringify(res.user));
-        closeAuth();
-        mountApp();
-      } catch (err) {
-        errEl.textContent = err.message;
-        errEl.classList.remove('hidden');
-      }
-    };
-
-    document.getElementById('logoutBtn').onclick = () => {
-      API.clearToken();
-      currentUser = null;
-      unmountApp();
-    };
-
-    document.getElementById('authModal').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('authModal')) closeAuth();
-    });
-
-    document.querySelectorAll('.nav-link').forEach(l => {
-      l.addEventListener('click', (e) => { e.preventDefault(); navigate(l.dataset.page); });
-    });
-  }
+  // ── Mount / unmount ───────────────────────────────────────────────────────
 
   function mountApp() {
     document.getElementById('landing').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
-    document.getElementById('navbar').classList.remove('hidden');
 
     const user = currentUser;
     document.getElementById('userName').textContent = user.name;
     const roleLbl = document.getElementById('roleLabel');
     roleLbl.textContent = { student: 'Étudiant', teacher: 'Enseignant', admin: 'Admin' }[user.role] || user.role;
-    roleLbl.className = 'role-badge ' + (user.role === 'teacher' ? 'teacher' : user.role === 'admin' ? 'admin' : '');
+    roleLbl.className = 'role-badge' + (user.role === 'teacher' ? ' teacher' : user.role === 'admin' ? ' admin' : '');
 
-    document.querySelectorAll('.admin-only').forEach(el => {
-      el.classList.toggle('hidden', user.role !== 'admin');
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', user.role !== 'admin'));
+
+    document.querySelectorAll('.nav-link').forEach(l => {
+      l.addEventListener('click', e => { e.preventDefault(); navigate(l.dataset.page); });
     });
+
+    document.getElementById('logoutBtn').onclick = () => {
+      API.clearToken();
+      // Clear Azure Easy Auth session too
+      window.location.href = '/.auth/logout?post_logout_redirect_uri=/';
+    };
 
     navigate('dashboard');
   }
 
-  function unmountApp() {
-    document.getElementById('appContainer').classList.add('hidden');
-    document.getElementById('navbar').style.display = '';
-    document.getElementById('landing').classList.remove('hidden');
-    currentPage = null;
-  }
+  // ── Init ──────────────────────────────────────────────────────────────────
 
   async function init() {
-    setupAuth();
-    const token = API.getToken();
-    if (token) {
+    // 1. Existing JWT — verify it's still valid
+    if (API.getToken()) {
       try {
-        const user = await API.me();
-        currentUser = user;
-        localStorage.setItem('qe_user', JSON.stringify(user));
+        currentUser = await API.me();
         mountApp();
         return;
       } catch {
-        API.clearToken();
+        API.clearToken(); // expired or invalid
       }
     }
+
+    // 2. Returning from Google OAuth — Azure Easy Auth session exists
+    try {
+      const res = await fetch('/.auth/me');
+      const sessions = await res.json();
+      if (Array.isArray(sessions) && sessions.length > 0) {
+        // Exchange Azure session for our JWT
+        const data = await API.post('/auth/google', {});
+        API.setToken(data.token);
+        currentUser = data.user;
+        mountApp();
+        return;
+      }
+    } catch { /* not authenticated with Google yet */ }
+
+    // 3. No session — show landing page
     document.getElementById('landing').classList.remove('hidden');
   }
 
-  function escHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
-  return { init, getUser, navigate, showAuth, closeAuth, switchAuthTab };
+  // Close auth modal on backdrop click
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('authModal').addEventListener('click', e => {
+      if (e.target === document.getElementById('authModal')) closeAuth();
+    });
+    init();
+  });
+
+  return { init, getUser, navigate, signInWithGoogle, showAuth, closeAuth, loadDashboard };
 })();
-
-document.addEventListener('DOMContentLoaded', () => App.init());
