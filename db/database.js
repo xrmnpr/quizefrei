@@ -112,11 +112,9 @@ async function init() {
       is_correct  BOOLEAN
     );
   `);
-  // Migrations — safe to run on every boot (IF NOT EXISTS / DO blocks are idempotent)
-  await pool.query(`
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT UNIQUE;
-    ALTER TABLE lists ADD COLUMN IF NOT EXISTS time_limit INTEGER;
-  `);
+  // Migrations — each in its own query so none gets silently skipped
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE lists ADD COLUMN IF NOT EXISTS time_limit INTEGER`);
   // Make password_hash nullable so Google-only users don't need one
   await pool.query(`
     DO $$ BEGIN

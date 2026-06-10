@@ -211,5 +211,5 @@ const Quiz = (() => {
 
   function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  return { start, launchQuiz, next, prev, goTo, selectChoice, setTextResponse, submitQuiz };
+  return { start, next, prev, goTo, selectChoice, setTextResponse, submitQuiz };
 })();
