@@ -26,14 +26,14 @@ router.post('/start', async (req, res) => {
     const questions = await db.query('SELECT * FROM questions WHERE list_id=$1 ORDER BY order_index', [list_id]);
     if (!questions.length) return res.status(400).json({ error: 'List has no questions' });
 
-    if (is_graded && req.user.role !== 'teacher' && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only teachers can create graded sessions' });
-    }
+    // Any quiz taken within a class is automatically graded so teachers can
+    // see results — no need for the frontend to pass is_graded explicitly.
+    const effectiveIsGraded = !!class_id || !!is_graded;
 
     const id = uuidv4();
     await db.query(
       'INSERT INTO quiz_sessions (id,list_id,user_id,class_id,time_limit,total_questions,is_graded) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id, list_id, req.user.id, class_id || null, time_limit || null, questions.length, !!is_graded]
+      [id, list_id, req.user.id, class_id || null, time_limit || null, questions.length, effectiveIsGraded]
     );
 
     const questionsWithChoices = await Promise.all(questions.map(async q => ({
