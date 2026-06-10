@@ -17,7 +17,7 @@ async function gradeResponse(question, r) {
 
 // Start a session
 router.post('/start', async (req, res) => {
-  const { list_id, class_id, time_limit, is_graded } = req.body;
+  const { list_id, class_id, is_graded } = req.body;
   if (!list_id) return res.status(400).json({ error: 'list_id is required' });
   try {
     const list = await db.queryOne('SELECT * FROM lists WHERE id=$1', [list_id]);
@@ -26,14 +26,16 @@ router.post('/start', async (req, res) => {
     const questions = await db.query('SELECT * FROM questions WHERE list_id=$1 ORDER BY order_index', [list_id]);
     if (!questions.length) return res.status(400).json({ error: 'List has no questions' });
 
-    // Any quiz taken within a class is automatically graded so teachers can
-    // see results — no need for the frontend to pass is_graded explicitly.
+    // Time limit comes from the list definition (minutes → seconds), not from the request.
+    const timeLimitSeconds = list.time_limit ? list.time_limit * 60 : null;
+
+    // Any quiz taken within a class is automatically graded so teachers can see results.
     const effectiveIsGraded = !!class_id || !!is_graded;
 
     const id = uuidv4();
     await db.query(
       'INSERT INTO quiz_sessions (id,list_id,user_id,class_id,time_limit,total_questions,is_graded) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [id, list_id, req.user.id, class_id || null, time_limit || null, questions.length, effectiveIsGraded]
+      [id, list_id, req.user.id, class_id || null, timeLimitSeconds, questions.length, effectiveIsGraded]
     );
 
     const questionsWithChoices = await Promise.all(questions.map(async q => ({
@@ -41,7 +43,7 @@ router.post('/start', async (req, res) => {
       choices: await db.query('SELECT id, choice_text FROM choices WHERE question_id=$1', [q.id])
     })));
 
-    res.status(201).json({ session_id: id, list_title: list.title, time_limit: time_limit || null, questions: questionsWithChoices });
+    res.status(201).json({ session_id: id, list_title: list.title, time_limit: timeLimitSeconds, questions: questionsWithChoices });
   } catch (err) {
     console.error('POST /sessions/start:', err.message);
     res.status(500).json({ error: 'Server error' });

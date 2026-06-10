@@ -47,7 +47,7 @@ const API = (() => {
     removeShare: (id, userId) => request('DELETE', `/lists/${id}/share/${userId}`),
 
     // Sessions
-    startSession: (data) => request('POST', '/sessions/start', data),
+    startSession: (data) => request('POST', '/sessions/start', { list_id: data.list_id, class_id: data.class_id }),
     submitSession: (id, responses) => request('POST', `/sessions/${id}/submit`, { responses }),
     getMySessions: () => request('GET', '/sessions/mine'),
     getSession: (id) => request('GET', `/sessions/${id}`),

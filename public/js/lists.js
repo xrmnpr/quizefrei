@@ -17,6 +17,7 @@ const Lists = (() => {
         <div class="list-card-meta">
           <span>📝 ${l.question_count} question${l.question_count !== 1 ? 's' : ''}</span>
           <span>👤 ${esc(l.owner_name)}</span>
+          ${l.time_limit ? `<span>⏱ ${l.time_limit} min</span>` : ''}
         </div>
         <div class="list-card-actions">
           <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();Quiz.start('${l.id}')">▶ Pratiquer</button>
@@ -70,6 +71,11 @@ const Lists = (() => {
         <div class="form-group"><label>Titre *</label><input type="text" name="title" required placeholder="Ex: Algorithmes - Tri"></div>
         <div class="form-group"><label>Description</label><textarea name="description" rows="3" placeholder="Description optionnelle"></textarea></div>
         <div class="form-group">
+          <label>Limite de temps (minutes)</label>
+          <input type="number" name="time_limit" min="1" max="180" placeholder="Sans limite">
+          <div class="text-sm text-muted" style="margin-top:.25rem">Laissez vide pour pas de limite</div>
+        </div>
+        <div class="form-group">
           <label class="form-check"><input type="checkbox" name="is_public"> Rendre cette liste publique</label>
         </div>
         <div class="form-actions">
@@ -85,6 +91,7 @@ const Lists = (() => {
         const list = await API.createList({
           title: fd.get('title'),
           description: fd.get('description') || null,
+          time_limit: fd.get('time_limit') || null,
           is_public: fd.get('is_public') === 'on'
         });
         Modal.close();
@@ -135,6 +142,7 @@ const Lists = (() => {
           <span>📝 ${list.questions.length} question${list.questions.length !== 1 ? 's' : ''}</span>
           <span>👤 ${esc(list.owner_name)}</span>
           <span>${list.is_public ? '🌐 Public' : '🔒 Privé'}</span>
+          ${list.time_limit ? `<span>⏱ ${list.time_limit} min</span>` : '<span>⏱ Sans limite</span>'}
         </div>
       </div>
       <div class="questions-list">${questionsHtml}</div>
@@ -176,6 +184,11 @@ const Lists = (() => {
           <div class="form-group"><label>Titre *</label><input type="text" name="title" required value="${esc(l.title)}"></div>
           <div class="form-group"><label>Description</label><textarea name="description" rows="3">${esc(l.description || '')}</textarea></div>
           <div class="form-group">
+            <label>Limite de temps (minutes)</label>
+            <input type="number" name="time_limit" min="1" max="180" placeholder="Sans limite" value="${l.time_limit || ''}">
+            <div class="text-sm text-muted" style="margin-top:.25rem">Laissez vide pour pas de limite</div>
+          </div>
+          <div class="form-group">
             <label class="form-check"><input type="checkbox" name="is_public" ${l.is_public ? 'checked' : ''}> Rendre publique</label>
           </div>
           <div class="form-actions">
@@ -188,7 +201,7 @@ const Lists = (() => {
         e.preventDefault();
         const fd = new FormData(e.target);
         try {
-          await API.updateList(id, { title: fd.get('title'), description: fd.get('description') || null, is_public: fd.get('is_public') === 'on' });
+          await API.updateList(id, { title: fd.get('title'), description: fd.get('description') || null, time_limit: fd.get('time_limit') || null, is_public: fd.get('is_public') === 'on' });
           Modal.close(); Toast.success('Liste mise à jour !'); openDetail(id);
         } catch (err) { Toast.error(err.message); }
       };

@@ -6,42 +6,19 @@ const Quiz = (() => {
   let timerInterval = null;
   let timeLeft = 0;
 
-  function start(listId, classId, timeLimit, isGraded) {
-    Modal.show(`
-      <h2 style="margin-bottom:1rem">Paramètres du quiz</h2>
-      <form id="quizSettingsForm">
-        <div class="form-group">
-          <label>Limite de temps (minutes)</label>
-          <input type="number" name="time_limit" min="1" max="180" placeholder="Sans limite" value="${timeLimit || ''}">
-          <div class="text-sm text-muted" style="margin-top:.3rem">Laissez vide pour pas de limite</div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" onclick="Modal.close()">Annuler</button>
-          <button type="submit" class="btn btn-primary">▶ Commencer</button>
-        </div>
-      </form>
-    `);
-    document.getElementById('quizSettingsForm').onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const tl = parseInt(fd.get('time_limit'));
-      Modal.close();
-      await launchQuiz(listId, classId, isNaN(tl) ? null : tl * 60, isGraded);
-    };
-  }
-
-  async function launchQuiz(listId, classId, timeLimitSeconds, isGraded) {
+  // Start a quiz — time limit is now defined on the list itself, not asked here.
+  async function start(listId, classId) {
     try {
-      const data = await API.startSession({ list_id: listId, class_id: classId || null, time_limit: timeLimitSeconds, is_graded: isGraded || false });
+      const data = await API.startSession({ list_id: listId, class_id: classId || null });
       session = { id: data.session_id, listTitle: data.list_title };
       questions = data.questions;
       currentIndex = 0;
       responses = {};
-      timeLeft = timeLimitSeconds;
+      timeLeft = data.time_limit; // seconds, as returned by the server (null = no limit)
 
       App.navigate('quiz');
       renderQuestion();
-      if (timeLimitSeconds) startTimer();
+      if (data.time_limit) startTimer();
     } catch (err) { Toast.error(err.message); }
   }
 

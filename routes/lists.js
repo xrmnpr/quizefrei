@@ -98,13 +98,14 @@ router.get('/:id', async (req, res) => {
 
 // Create list
 router.post('/', async (req, res) => {
-  const { title, description, is_public } = req.body;
+  const { title, description, is_public, time_limit } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
   try {
     const id = uuidv4();
+    const tl = time_limit ? Number(time_limit) : null;
     await db.query(
-      'INSERT INTO lists (id, title, description, owner_id, is_public) VALUES ($1,$2,$3,$4,$5)',
-      [id, title, description || null, req.user.id, !!is_public]
+      'INSERT INTO lists (id, title, description, owner_id, is_public, time_limit) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, title, description || null, req.user.id, !!is_public, tl]
     );
     res.status(201).json(await db.queryOne('SELECT * FROM lists WHERE id = $1', [id]));
   } catch (err) {
@@ -120,11 +121,13 @@ router.put('/:id', async (req, res) => {
     if (!list) return res.status(404).json({ error: 'List not found' });
     if (list.owner_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Not authorized' });
 
-    const { title, description, is_public } = req.body;
-    await db.query('UPDATE lists SET title=$1, description=$2, is_public=$3 WHERE id=$4', [
+    const { title, description, is_public, time_limit } = req.body;
+    const tl = time_limit !== undefined ? (time_limit ? Number(time_limit) : null) : list.time_limit;
+    await db.query('UPDATE lists SET title=$1, description=$2, is_public=$3, time_limit=$4 WHERE id=$5', [
       title ?? list.title,
       description !== undefined ? description : list.description,
       is_public !== undefined ? !!is_public : list.is_public,
+      tl,
       req.params.id
     ]);
     res.json(await db.queryOne('SELECT * FROM lists WHERE id = $1', [req.params.id]));
