@@ -289,7 +289,7 @@ const Lists = (() => {
             ${rows.map((c, i) => `
               <div style="display:flex;align-items:center;gap:.5rem">
                 <input type="checkbox" name="is_correct[]" value="${i}" ${c?.is_correct ? 'checked' : ''}>
-                <input type="text" name="choice_text" placeholder="Choix ${i + 1}" value="${esc(c?.choice_text || '')}" style="flex:1;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.875rem">
+                <input type="text" name="choice_text" placeholder="Choix ${i + 1}" value="${esc(c?.choice_text || '')}" style="flex:1;width:auto;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.875rem;color:var(--text)">
               </div>
             `).join('')}
           </div>
@@ -304,7 +304,7 @@ const Lists = (() => {
     const i = list.children.length;
     const div = document.createElement('div');
     div.style.cssText = 'display:flex;align-items:center;gap:.5rem';
-    div.innerHTML = `<input type="checkbox" name="is_correct[]" value="${i}"><input type="text" name="choice_text" placeholder="Choix ${i + 1}" style="flex:1;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.875rem">`;
+    div.innerHTML = `<input type="checkbox" name="is_correct[]" value="${i}"><input type="text" name="choice_text" placeholder="Choix ${i + 1}" style="flex:1;width:auto;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:.875rem;color:var(--text)">`;
     list.appendChild(div);
   }
 
