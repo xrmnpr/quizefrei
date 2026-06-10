@@ -28,9 +28,9 @@ const API = (() => {
     delete: (p) => request('DELETE', p),
 
     // Auth
-    login: (email, password) => request('POST', '/auth/login', { email, password }),
-    register: (data) => request('POST', '/auth/register', data),
     me: () => request('GET', '/auth/me'),
+    googleAuth: () => request('POST', '/auth/google', {}),
+    completeRegistration: (registration_token, role) => request('POST', '/auth/complete-registration', { registration_token, role }),
 
     // Lists
     getLists: () => request('GET', '/lists'),

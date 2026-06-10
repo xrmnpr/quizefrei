@@ -1,13 +1,13 @@
 const App = (() => {
   let currentUser = null;
   let currentPage = null;
+  let pendingRegistrationToken = null; // stored server-side reference, never in DOM
 
   function getUser() { return currentUser; }
 
   // ── Google / Easy Auth ────────────────────────────────────────────────────
 
   function signInWithGoogle() {
-    // After Google auth, Azure redirects back to the same URL
     window.location.href = '/.auth/login/google?post_login_redirect_uri=' + encodeURIComponent(window.location.pathname + window.location.search);
   }
 
@@ -16,6 +16,60 @@ const App = (() => {
   }
   function closeAuth() {
     document.getElementById('authModal').classList.add('hidden');
+  }
+
+  // Show role-picker after Google auth for new accounts
+  function showRoleSelection() {
+    Modal.show(`
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="font-size:2rem;margin-bottom:.5rem">👋</div>
+        <h2 style="margin-bottom:.5rem">Bienvenue !</h2>
+        <p style="color:var(--text-muted);font-size:.9rem">Avant de commencer, dites-nous qui vous êtes.</p>
+      </div>
+      <div class="role-select" style="margin-bottom:1.5rem">
+        <label class="role-option">
+          <input type="radio" name="reg_role" value="student" checked>
+          <span class="role-card"><span class="role-card-icon">🎓</span><span>Étudiant</span></span>
+        </label>
+        <label class="role-option">
+          <input type="radio" name="reg_role" value="teacher">
+          <span class="role-card"><span class="role-card-icon">👨‍🏫</span><span>Enseignant</span></span>
+        </label>
+      </div>
+      <div id="regError" class="form-error hidden"></div>
+      <button class="btn btn-primary btn-full" id="confirmRoleBtn">Créer mon compte</button>
+    `);
+    document.getElementById('confirmRoleBtn').onclick = completeRegistration;
+  }
+
+  async function completeRegistration() {
+    const role = document.querySelector('input[name="reg_role"]:checked')?.value;
+    const errEl = document.getElementById('regError');
+    if (!role) return;
+
+    const btn = document.getElementById('confirmRoleBtn');
+    btn.disabled = true;
+    btn.textContent = 'Création...';
+    errEl.classList.add('hidden');
+
+    try {
+      const data = await API.completeRegistration(pendingRegistrationToken, role);
+      pendingRegistrationToken = null;
+      API.setToken(data.token);
+      currentUser = data.user;
+      Modal.close();
+      closeAuth();
+      mountApp();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Créer mon compte';
+      // Token may have expired — send user back to Google
+      if (err.status === 401) {
+        setTimeout(() => signInWithGoogle(), 2000);
+      }
+    }
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -161,8 +215,16 @@ const App = (() => {
       const res = await fetch('/.auth/me');
       const sessions = await res.json();
       if (Array.isArray(sessions) && sessions.length > 0) {
-        // Exchange Azure session for our JWT
-        const data = await API.post('/auth/google', {});
+        const data = await API.googleAuth();
+
+        if (data.needs_registration) {
+          // New user — store token and show role picker
+          pendingRegistrationToken = data.registration_token;
+          document.getElementById('landing').classList.remove('hidden');
+          showRoleSelection();
+          return;
+        }
+
         API.setToken(data.token);
         currentUser = data.user;
         mountApp();
