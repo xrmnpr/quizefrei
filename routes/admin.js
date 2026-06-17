@@ -52,6 +52,23 @@ router.put('/users/:id/role', async (req, res) => {
   }
 });
 
+router.get('/sessions', async (req, res) => {
+  try {
+    res.json(await db.query(`
+      SELECT qs.*, u.name AS student_name, u.email AS student_email,
+        l.title AS list_title, c.name AS class_name
+      FROM quiz_sessions qs
+      JOIN users u ON u.id = qs.user_id
+      JOIN lists l ON l.id = qs.list_id
+      LEFT JOIN classes c ON c.id = qs.class_id
+      ORDER BY qs.started_at DESC
+    `));
+  } catch (err) {
+    console.error('GET /admin/sessions:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/users/:id', async (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
   try {

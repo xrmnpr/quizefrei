@@ -69,6 +69,7 @@ const API = (() => {
     adminStats: () => request('GET', '/admin/stats'),
     adminUsers: () => request('GET', '/admin/users'),
     adminUpdateRole: (id, role) => request('PUT', `/admin/users/${id}/role`, { role }),
-    adminDeleteUser: (id) => request('DELETE', `/admin/users/${id}`)
+    adminDeleteUser: (id) => request('DELETE', `/admin/users/${id}`),
+    adminSessions: () => request('GET', '/admin/sessions')
   };
 })();
