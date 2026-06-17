@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
 function authenticate(req, res, next) {
