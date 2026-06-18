@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz'Efrei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar" id="navbar">
+  <div class="nav-brand">
+    <span class="brand-icon">Q</span>
+    <span>Quiz<span class="brand-accent">'Efrei</span></span>
+  </div>
+  <div class="nav-links" id="navLinks">
+    <a href="#" class="nav-link" data-page="dashboard">Accueil</a>
+    <a href="#" class="nav-link" data-page="lists">Mes listes</a>
+    <a href="#" class="nav-link" data-page="classes">Classes</a>
+    <a href="#" class="nav-link admin-only hidden" data-page="admin">Admin</a>
+  </div>
+  <div class="nav-right">
+    <div class="user-pill" id="userPill">
+      <span id="userName"></span>
+      <span class="role-badge" id="roleLabel"></span>
+    </div>
+    <button class="btn btn-outline btn-sm" id="logoutBtn">Déconnexion</button>
+  </div>
+</nav>
+
+<!-- LANDING -->
+<div id="landing" class="page">
+  <div class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Pour les étudiants EFREI</div>
+      <h1 class="hero-title">Révisez mieux,<br>ensemble.</h1>
+      <p class="hero-sub">Quiz'Efrei est la plateforme de révision collaborative des étudiants et enseignants de l'EFREI. Créez des listes de révision, pratiquez des quiz interactifs et suivez votre progression.</p>
+      <div class="hero-actions">
+        <button class="btn-google-lg" onclick="App.signInWithGoogle()">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="visual-card">
+        <div class="vc-header"><span class="vc-dot red"></span><span class="vc-dot yellow"></span><span class="vc-dot green"></span></div>
+        <div class="vc-question">Quelle est la complexité de quicksort en moyenne ?</div>
+        <div class="vc-choices">
+          <div class="vc-choice">O(n)</div>
+          <div class="vc-choice correct">O(n log n) ✓</div>
+          <div class="vc-choice">O(n²)</div>
+          <div class="vc-choice">O(log n)</div>
+        </div>
+        <div class="vc-score">Score: 85% <span class="score-bar"><span style="width:85%"></span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="features-section">
+    <h2 class="section-title">Tout ce dont vous avez besoin</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <h3>Listes de révision</h3>
+        <p>Créez, modifiez et partagez des listes de questions. Plusieurs types de questions supportés.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Quiz interactifs</h3>
+        <p>Pratiquez avec des quiz chronométrés. Score calculé automatiquement avec correction détaillée.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎓</div>
+        <h3>Espace enseignant</h3>
+        <p>Gérez vos classes, invitez des étudiants et évaluez-les avec des quiz notés.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤝</div>
+        <h3>Partage & collaboration</h3>
+        <p>Partagez vos listes avec vos camarades ou rejoignez les listes de vos enseignants.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" class="hidden">
+
+  <!-- DASHBOARD -->
+  <div id="dashboardPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1 id="dashGreeting">Bonjour !</h1>
+        <p class="page-sub" id="dashSub">Que voulez-vous faire aujourd'hui ?</p>
+      </div>
+    </div>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="dash-grid">
+      <div class="dash-section">
+        <div class="section-header">
+          <h2>Activité récente</h2>
+          <a href="#" class="link" onclick="App.navigate('lists')">Voir tout</a>
+        </div>
+        <div id="recentActivity" class="activity-list"></div>
+      </div>
+      <div class="dash-section">
+        <div class="section-header">
+          <h2>Raccourcis</h2>
+        </div>
+        <div class="shortcuts-grid" id="shortcuts"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LISTS PAGE -->
+  <div id="listsPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1>Mes listes</h1>
+        <p class="page-sub">Gérez vos listes de révision</p>
+      </div>
+      <button class="btn btn-primary" onclick="Lists.showCreate()">+ Nouvelle liste</button>
+    </div>
+
+    <div class="tabs-row">
+      <button class="tab-btn active" onclick="Lists.switchTab('mine')">Mes listes</button>
+      <button class="tab-btn" onclick="Lists.switchTab('shared')">Partagées avec moi</button>
+      <button class="tab-btn" onclick="Lists.switchTab('public')">Publiques</button>
+    </div>
+
+    <div class="search-row">
+      <input type="text" class="search-input" placeholder="Rechercher une liste..." oninput="Lists.filter(this.value)">
+    </div>
+
+    <div id="listsGrid" class="lists-grid"></div>
+  </div>
+
+  <!-- LIST DETAIL -->
+  <div id="listDetailPage" class="page-content hidden">
+    <div class="page-header">
+      <button class="btn btn-ghost" onclick="App.navigate('lists')">← Retour</button>
+      <div class="header-actions" id="listActions"></div>
+    </div>
+    <div id="listDetailContent"></div>
+  </div>
+
+  <!-- QUIZ PLAYER -->
+  <div id="quizPage" class="page-content hidden">
+    <div id="quizContent"></div>
+  </div>
+
+  <!-- CLASSES PAGE -->
+  <div id="classesPage" class="page-content hidden">
+    <div class="page-header">
+      <div>
+        <h1>Classes</h1>
+        <p class="page-sub" id="classesSubtitle">Vos classes</p>
+      </div>
+      <div id="classesHeaderActions"></div>
+    </div>
+    <div id="classesGrid" class="lists-grid"></div>
+  </div>
+
+  <!-- CLASS DETAIL -->
+  <div id="classDetailPage" class="page-content hidden">
+    <div class="page-header">
+      <button class="btn btn-ghost" onclick="App.navigate('classes')">← Retour</button>
+      <div id="classDetailActions"></div>
+    </div>
+    <div id="classDetailContent"></div>
+  </div>
+
+  <!-- ADMIN PAGE -->
+  <div id="adminPage" class="page-content hidden">
+    <div class="page-header">
+      <h1>Administration</h1>
+    </div>
+    <div id="adminContent"></div>
+  </div>
+
+</div>
+
+<!-- AUTH MODAL (shown only when the user explicitly clicks a sign-in button) -->
+<div class="modal-overlay hidden" id="authModal">
+  <div class="modal" style="text-align:center;padding:2.5rem 2rem">
+    <div class="auth-logo">
+      <span class="brand-icon" style="width:48px;height:48px;font-size:1.5rem;margin:0 auto 1rem">Q</span>
+    </div>
+    <h2 style="margin-bottom:.5rem">Bienvenue sur Quiz'Efrei</h2>
+    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:2rem">Connectez-vous avec votre compte Google pour continuer.</p>
+    <button class="btn-google" onclick="App.signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continuer avec Google
+    </button>
+    <div id="authError" class="form-error hidden" style="margin-top:1rem;text-align:left"></div>
+  </div>
+</div>
+
+<!-- GENERIC MODAL -->
+<div class="modal-overlay hidden" id="genericModal">
+  <div class="modal" id="genericModalBox">
+    <button class="modal-close" onclick="Modal.close()">✕</button>
+    <div id="genericModalContent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/modal.js"></script>
+<script src="/js/lists.js"></script>
+<script src="/js/quiz.js"></script>
+<script src="/js/classes.js"></script>
+<script src="/js/admin.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
